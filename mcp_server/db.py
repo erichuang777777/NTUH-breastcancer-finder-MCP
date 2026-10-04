@@ -498,9 +498,14 @@ def search_doctors(
         params.extend([like, like, like])
 
     if specialty:
-        # specialty_tags_json is a JSON array string, e.g. ["breast_surgery"]
-        where.append("IFNULL(d.specialty_tags_json,'') LIKE ?")
-        params.append(f"%{specialty}%")
+        # tags, department name, or notes (so 放射/麻醉 match 影像醫學部/麻醉部)
+        where.append(
+            "(IFNULL(d.specialty_tags_json,'') LIKE ? "
+            "OR IFNULL(d.department_zh,'') LIKE ? "
+            "OR IFNULL(d.notes,'') LIKE ?)"
+        )
+        like = f"%{specialty}%"
+        params.extend([like, like, like])
 
     if is_specialist is True:
         where.append("d.is_breast_specialist = 1")

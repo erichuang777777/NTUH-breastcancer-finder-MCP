@@ -118,45 +118,114 @@ def infer_hosp_code(slot: dict[str, Any], hospital_id: str) -> str:
     return NTUH_REG_HOSP_CODES.get(hospital_id, "T0")
 
 
-def extract_regform_hrefs(html: str) -> list[tuple[str, str]]:
-    """Return [(button_label, relative_RegForm_href), ...] for bookable tags."""
+_ROC_DATE_RE = re.compile(r"(1\d{2})\.(\d{1,2})\.(\d{1,2})")
+_BOOKING_CODE_RE = re.compile(r"預約碼\s*[:：]\s*([0-9A-Za-z]+)")
+
+
+def _roc_to_iso(text: str) -> str | None:
+    m = _ROC_DATE_RE.search(text or "")
+    if not m:
+        return None
+    y = int(m.group(1)) + 1911
+    return f"{y:04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+
+
+def _modal_for_button(btn) -> Any:
+    parent = btn.parent
+    if parent is None:
+        return None
+    sib = parent.find_next_sibling("div")
+    if sib and "modal" in (sib.get("class") or []):
+        return sib
+    return None
+
+
+def _button_meta(btn) -> dict[str, str]:
+    """Date / session / 預約碼 from the clinic modal next to a doctor-tag."""
+    modal = _modal_for_button(btn)
+    text = modal.get_text("\n", strip=True) if modal else ""
+    meta: dict[str, str] = {}
+    iso = _roc_to_iso(text)
+    if iso:
+        meta["clinic_date"] = iso
+    for sess in ("上午", "下午", "夜間"):
+        if f"{sess}門診" in text:
+            meta["session"] = sess
+            break
+    m = _BOOKING_CODE_RE.search(text)
+    if m:
+        meta["booking_code"] = m.group(1)
+    return meta
+
+
+def extract_regform_hrefs(html: str) -> list[tuple[str, str, dict[str, str]]]:
+    """Return [(button_label, relative_RegForm_href, meta), ...] for bookable tags.
+
+    ``meta`` may include clinic_date (YYYY-MM-DD), session, and booking_code
+    (預約碼) taken from the adjacent clinic modal.
+    """
     soup = BeautifulSoup(html or "", "html.parser")
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, dict[str, str]]] = []
     for btn in soup.select("button.doctor-tag"):
         oc = btn.get("onclick") or ""
         m = _REGFORM_RE.search(oc)
         if not m:
             continue
         label = btn.get_text(" ", strip=True)
-        out.append((label, f"RegForm?newx={m.group(1)}"))
+        out.append((label, f"RegForm?newx={m.group(1)}", _button_meta(btn)))
     return out
 
 
 def match_regform_for_slot(
-    hrefs: list[tuple[str, str]], slot: dict[str, Any]
+    hrefs: list[tuple], slot: dict[str, Any]
 ) -> str | None:
-    """Pick RegForm href matching slot doctor / clinic hints.
+    """Pick RegForm href matching slot doctor, date, session, and clinic code.
 
     If ``name_zh`` is set, require the doctor name to appear on a bookable
     button label — never silently fall back to another physician's RegForm.
+    When the slot has a clinic date and the page modals expose dates, require
+    that date. Same for 預約碼 (``local_clinic_code``) when both sides have one.
     """
     name = (slot.get("name_zh") or "").strip()
     clinic = (slot.get("local_clinic_code") or "").strip()
     session = (slot.get("session") or "").strip()
+    want_date = (slot.get("clinic_date") or "")[:10]
+    parsed: list[tuple[str, str, dict[str, str]]] = []
+    for item in hrefs:
+        label = item[0]
+        href = item[1]
+        meta = item[2] if len(item) > 2 and isinstance(item[2], dict) else {}
+        parsed.append((label, href, meta))
+    page_has_dates = any(m.get("clinic_date") for _, _, m in parsed)
+    page_has_codes = any(m.get("booking_code") for _, _, m in parsed)
     scored: list[tuple[int, str]] = []
-    for label, href in hrefs:
+    for label, href, meta in parsed:
         if name and name not in label:
             continue
+        if want_date and page_has_dates and meta.get("clinic_date") and meta["clinic_date"] != want_date:
+            continue
+        if (
+            clinic
+            and page_has_codes
+            and clinic.isdigit()
+            and meta.get("booking_code")
+            and meta["booking_code"] != clinic
+        ):
+            continue
+        if session and meta.get("session") and meta["session"] != session:
+            continue
         score = 10 if name else 0
-        if clinic and clinic in label:
-            score += 3
-        if session and session in label:
-            score += 1
+        if clinic and (clinic == meta.get("booking_code") or clinic in label):
+            score += 4
+        if session and (meta.get("session") == session or session in label):
+            score += 2
+        if want_date and meta.get("clinic_date") == want_date:
+            score += 5
         scored.append((score, href))
     if name and not scored:
         return None
     if not scored:
-        return hrefs[0][1] if hrefs else None
+        return parsed[0][1] if parsed else None
     scored.sort(key=lambda x: -x[0])
     return scored[0][1]
 

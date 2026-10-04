@@ -18,7 +18,7 @@
 
 舊 OpenOnco id（`nhia_0401020013` 癌醫、`nhia_0412040012` 新竹、`nhia_0439010518` 與 `h_2f3e46a806` 雲林）若在 DB 裡會一併被搜尋，掛號時對到上表的 canonical id。
 
-流程對照：[`NTUH_WEBREG_FLOW.md`](NTUH_WEBREG_FLOW.md)。與全臺乳癌 finder 的關係：本 repo 從 OpenOnco Breast Finder 削出 NTUH 掛號與搜尋，DB 以 `scripts/export_ntuh_db.py` 從 `breast_care.db` 匯出。
+流程對照：[`NTUH_WEBREG_FLOW.md`](NTUH_WEBREG_FLOW.md)。掛號程式從 OpenOnco Breast Finder 削出。全院區全科名冊／診次以 `scripts/import_ntuh_webreg_catalog.py` 從公開 WebReg 匯入 `data/ntuh.db`（`export_ntuh_db.py` 只重建乳癌骨架）。
 
 PII：工具參數禁止傳完整身分證。Server 讀 `PATIENT_ID`、`PATIENT_BIRTHDATE`。
 
