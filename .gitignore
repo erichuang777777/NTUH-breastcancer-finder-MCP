@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# scrape / captcha / dry-run artifacts (may contain PII)
+schedules/raw/
+**/captcha*.png
+**/*_submit_result*.html
+
+# local secrets / patient env
+patient.env
+*.pem
+*.key
+
+# sqlite sidecars
+*.db-journal
+*.db-wal
+*.db-shm
