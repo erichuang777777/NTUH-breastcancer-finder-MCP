@@ -56,7 +56,7 @@ OPTIONAL_ENV_VARS = (
     "TZUCHI_TAIPEI_REG_AUTOSUBMIT",  # 1 to allow real POST (台北慈濟) — leave unset
     "MMH_WEBWORD",  # optional 馬偕網路密碼
     "NTUH_RECAPTCHA_TOKEN",  # optional pre-minted gRecaptcha v3 token
-    "NTUH_REG_HOSP_CODE",  # C0|T7|T4|T0 override
+    "NTUH_REG_HOSP_CODE",  # T0|CH|C0|T2|T3|T4|T7|Y0 override
     "NTUH_RECAPTCHA_HEADLESS",  # 0 = headed Chromium for mint
     "NTUH_RECAPTCHA_TIMEOUT_MS",  # Playwright timeout, default 60000
     "CGMH_REG_CAMPUS",  # 3=Linkou|1=Taipei|2=Keelung|6=Chiayi|8=Kaohsiung

@@ -7,9 +7,9 @@ plus doctors, clinic_slots, leave, live progress, reviews, profiles, and
 person links for those hospitals. Does **not** filter by breast specialty.
 
 Also inserts catalog rows for campuses that WebReg has but OpenOnco did not
-store as their own id: 兒童醫院 (ntuh_children / CH) and a canonical
-雲林 id (ntuh_yunlin / Y0). 竹東 is not a separate hospital_id; it is part of
-新竹臺大分院生醫 (T7) under ntuh_hsinchu.
+store as their own id: 兒童醫院 (ntuh_children / CH)、北護 (ntuh_beihu / T2)、
+金山 (ntuh_jinshan / T3)、and a canonical 雲林 id (ntuh_yunlin / Y0). 竹東 is
+not a separate hospital_id; it is part of 新竹臺大分院生醫 (T7) under ntuh_hsinchu.
 
 Usage:
   PYTHONPATH=. python scripts/export_ntuh_db.py
@@ -105,6 +105,44 @@ def _upsert_catalog(dst: sqlite3.Connection) -> None:
             "notes": (
                 "WebReg vHospCode=CH。OpenOnco breast_care.db 沒有兒童醫院名冊或診次；"
                 "此列只是院區目錄。全科掛號可帶 registration_url。"
+            ),
+            "updated_at": now,
+        },
+        {
+            "hospital_id": "ntuh_beihu",
+            "name_zh": "國立臺灣大學醫學院附設醫院北護分院",
+            "name_en": "National Taiwan University Hospital Bei-Hu Branch",
+            "campus": "北護分院",
+            "city": "臺北市",
+            "address": "臺北市萬華區內江街87號（康定路37號）",
+            "system_family": "ntuh",
+            "nhia_code": "0401190010",
+            "registration_hub_url": "https://reg.ntuh.gov.tw/WebReg/WebReg/BranchIndex?vHospCode=T2",
+            "progress_hub_url": "https://reg.ntuh.gov.tw/WebReg/WebReg/ClinicCurrentLightNo?vHospCode=T2",
+            "adapter_id": "ntuh_beihu",
+            "timezone": "Asia/Taipei",
+            "notes": (
+                "WebReg vHospCode=T2。官方站 https://www.bh.ntuh.gov.tw/。"
+                "OpenOnco breast_care.db 沒有北護名冊；全科以 WebReg 匯入。"
+            ),
+            "updated_at": now,
+        },
+        {
+            "hospital_id": "ntuh_jinshan",
+            "name_zh": "國立臺灣大學醫學院附設醫院金山分院",
+            "name_en": "National Taiwan University Hospital Jinshan Branch",
+            "campus": "金山分院",
+            "city": "新北市",
+            "address": "新北市金山區玉爐路7號",
+            "system_family": "ntuh",
+            "nhia_code": "0431270012",
+            "registration_hub_url": "https://reg.ntuh.gov.tw/WebReg/WebReg/BranchIndex?vHospCode=T3",
+            "progress_hub_url": "https://reg.ntuh.gov.tw/WebReg/WebReg/ClinicCurrentLightNo?vHospCode=T3",
+            "adapter_id": "ntuh_jinshan",
+            "timezone": "Asia/Taipei",
+            "notes": (
+                "WebReg vHospCode=T3。官方站 https://www.js.ntuh.gov.tw/。"
+                "OpenOnco breast_care.db 沒有金山名冊；全科以 WebReg 匯入。"
             ),
             "updated_at": now,
         },

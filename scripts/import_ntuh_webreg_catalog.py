@@ -11,10 +11,12 @@ This is the bookable roster (physicians who have a clinic in the open window),
 not a staff-directory of every employed physician. Departments with no clinic
 in the window are recorded on the scrape_runs row but do not invent doctors.
 
-Campus codes (confirmed on WebReg, 2026-10):
+Campus codes (confirmed on WebReg BranchIndex, 2026-10):
   T0 總院 → ntuh
   CH 兒童醫院 → ntuh_children
   C0 癌醫 → ntuh_cancer
+  T2 北護分院 → ntuh_beihu
+  T3 金山分院 → ntuh_jinshan
   T4 新竹醫院 → ntuh_hsinchu   (same hospital_id as T7; notes carry T4)
   T7 生醫（竹北／竹東）→ ntuh_hsinchu
   Y0 雲林（斗六／虎尾）→ ntuh_yunlin
@@ -66,6 +68,8 @@ CAMPUS_HOSPITAL = {
     "T0": "ntuh",
     "CH": "ntuh_children",
     "C0": "ntuh_cancer",
+    "T2": "ntuh_beihu",
+    "T3": "ntuh_jinshan",
     "T4": "ntuh_hsinchu",
     "T7": "ntuh_hsinchu",
     "Y0": "ntuh_yunlin",
@@ -75,6 +79,8 @@ CAMPUS_LABEL = {
     "T0": "總院",
     "CH": "兒童醫院",
     "C0": "癌醫中心分院",
+    "T2": "北護分院",
+    "T3": "金山分院",
     "T4": "新竹醫院",
     "T7": "生醫（竹北／竹東）",
     "Y0": "雲林（斗六／虎尾）",
@@ -785,7 +791,7 @@ def main() -> None:
     )
     ap.add_argument("--interval", type=float, default=0.7)
     args = ap.parse_args()
-    campuses = args.campus or ["T0", "CH", "C0", "T4", "T7", "Y0"]
+    campuses = args.campus or ["T0", "CH", "C0", "T2", "T3", "T4", "T7", "Y0"]
     print("campuses", campuses, "db", args.db, flush=True)
     result = apply(Path(args.db), campuses, args.interval)
     print(json.dumps({k: v for k, v in result.items() if k != "summary"}, ensure_ascii=False, indent=2))

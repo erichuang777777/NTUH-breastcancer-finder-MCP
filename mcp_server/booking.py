@@ -95,7 +95,7 @@ def get_live_number(
         hospital_id: any adapter id (ntuh*, cgmh*, vghtpe, kmuh, cheng_hsin, …)
         doctor_name_zh: optional name filter
         session: 上午/下午/夜間; omit = all returned sessions
-        campus_code: C0/T7/T4/T0 hint (sets NTUH_REG_HOSP_CODE for this call)
+        campus_code: T0/CH/C0/T2/T3/T4/T7/Y0 hint (sets NTUH_REG_HOSP_CODE for this call)
         persist: upsert into live_progress SQLite table (ignored when from_db)
         from_db: if true, return the latest live_progress rows already stored
             (no network). get_progress_pace always reads live_progress_history.

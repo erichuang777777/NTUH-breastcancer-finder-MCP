@@ -18,6 +18,8 @@ NTUH_FAMILY = (
     "ntuh",
     "ntuh_children",
     "ntuh_cancer",
+    "ntuh_beihu",
+    "ntuh_jinshan",
     "ntuh_hsinchu",
     "ntuh_yunlin",
 )

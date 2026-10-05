@@ -1,4 +1,4 @@
-"""NTUH family WebReg registration adapter (T0/C0/T4/T7).
+"""NTUH family WebReg registration adapter (T0/CH/C0/T2/T3/T4/T7/Y0).
 
 Flow (public pages):
   BranchIndex?vHospCode=XX
@@ -57,6 +57,8 @@ NTUH_REG_HOSP_CODES: dict[str, str] = {
     "ntuh": "T0",            # 總院
     "ntuh_children": "CH",   # 兒童醫院
     "ntuh_cancer": "C0",     # 癌醫
+    "ntuh_beihu": "T2",      # 北護分院
+    "ntuh_jinshan": "T3",    # 金山分院
     "ntuh_hsinchu": "T7",    # 生醫／竹北（含竹東）；T4 新竹醫院 via slot notes
     "ntuh_yunlin": "Y0",     # 雲林（斗六／虎尾）
     # legacy OpenOnco ids
@@ -82,6 +84,8 @@ DEFAULT_SCHEDULE_URLS: dict[str, str] = {
     ),
     "T0": f"{REG_BASE}BranchIndex?vHospCode=T0",
     "CH": f"{REG_BASE}BranchIndex?vHospCode=CH",
+    "T2": f"{REG_BASE}BranchIndex?vHospCode=T2",
+    "T3": f"{REG_BASE}BranchIndex?vHospCode=T3",
     "Y0": f"{REG_BASE}BranchIndex?vHospCode=Y0",
 }
 

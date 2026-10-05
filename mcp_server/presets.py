@@ -260,7 +260,7 @@ def preset_create(
     Does not contact WebReg. Arm it, then run scripts/run_preset_at_open.py.
 
     Args:
-        hospital_id: ntuh / ntuh_children / ntuh_cancer / ntuh_hsinchu / ntuh_yunlin
+        hospital_id: ntuh / ntuh_children / ntuh_cancer / ntuh_beihu / ntuh_jinshan / ntuh_hsinchu / ntuh_yunlin
             (legacy nhia_* / h_* ids that belong to those campuses are accepted)
         doctor_name: fuzzy name stored on the preset (or pass doctor_id / slot_id)
         doctor_id: optional doctors.doctor_id

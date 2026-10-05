@@ -13,6 +13,8 @@
 | `ntuh` | T0 | 總院 |
 | `ntuh_children` | CH | 兒童醫院 |
 | `ntuh_cancer` | C0 | 癌醫中心分院 |
+| `ntuh_beihu` | T2 | 北護分院 |
+| `ntuh_jinshan` | T3 | 金山分院 |
 | `ntuh_hsinchu` | T4／T7 | 新竹醫院／生醫（竹北，含原竹東院區） |
 | `ntuh_yunlin` | Y0 | 雲林分院（斗六／虎尾） |
 

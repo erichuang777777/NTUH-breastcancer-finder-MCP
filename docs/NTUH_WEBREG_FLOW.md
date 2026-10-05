@@ -111,7 +111,7 @@
 | `PATIENT_NATION` | 預設 `TWN` |
 | `NTUH_REG_AUTOSUBMIT` | 設為 `1` 才允許真正 POST |
 | `NTUH_RECAPTCHA_TOKEN` | 預先取得的 v3 token |
-| `NTUH_REG_HOSP_CODE` | 強制院區碼 `T0`/`CH`/`C0`/`T4`/`T7`/`Y0` |
+| `NTUH_REG_HOSP_CODE` | 強制院區碼 `T0`/`CH`/`C0`/`T2`/`T3`/`T4`/`T7`/`Y0` |
 
 ---
 
