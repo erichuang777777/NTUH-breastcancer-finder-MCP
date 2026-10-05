@@ -523,20 +523,31 @@ class NtuhCancerAdapter(HospitalAdapter):
         }
         return slots
 
-    def fetch_live_progress(self) -> list[dict]:
-        """ClinicCurrentLightNo C0 → filter DeptCode=KBRC."""
-        from .ntuh_progress import fetch_breast_live_progress
+    def fetch_live_progress(
+        self,
+        *,
+        breast_only: bool = False,
+        fetch_details: bool = True,
+        ampm_codes: list[str] | None = None,
+        campus_code: str | None = None,
+    ) -> list[dict]:
+        """ClinicCurrentLightNo C0 — all depts by default; optional breast filter."""
+        from .ntuh_progress import fetch_live_progress
 
-        rows = fetch_breast_live_progress(
+        rows = fetch_live_progress(
             hospital_id=self.hospital_id,
             hosp_codes=["C0"],
             progress_row_fn=self.progress_row,
+            breast_only=breast_only,
+            fetch_details=fetch_details,
+            ampm_codes=ampm_codes,
+            campus_code=campus_code,
         )
         self.last_fetch_report = {
             **getattr(self, "last_fetch_report", {}),
             "progress_total": len(rows),
             "progress_hosp_codes": ["C0"],
-            "progress_filter": "KBRC",
+            "progress_filter": "breast" if breast_only else "all_depts",
         }
         return rows
 

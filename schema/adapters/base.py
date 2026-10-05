@@ -98,7 +98,7 @@ class HospitalAdapter(ABC):
 
     @abstractmethod
     def fetch_live_progress(self) -> list[dict]:
-        """→ LiveProgress rows (breast-filtered only)."""
+        """→ LiveProgress rows (all departments by default; optional breast filter)."""
 
     def fetch_registration_links(self) -> list[dict]:
         """→ RegistrationLink rows. Default: empty."""

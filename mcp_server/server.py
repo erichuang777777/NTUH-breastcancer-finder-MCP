@@ -36,7 +36,7 @@ mcp = FastMCP(
         "全科醫師搜尋與掛號 MCP（stdio）。不是只限乳癌；乳房照護只是其中一種用法。"
         "資料在本地 data/ntuh.db。預設只查 NTUH hospital_id，不過濾 breast specialty。"
         "醫師：search_doctors / get_doctor / list_leave_or_stops / list_cities / list_hospitals。"
-        "診次與燈號：search_bookable / get_live_number / get_progress_pace。"
+        "診次與燈號：search_bookable / get_live_number（全院區全科；可選 breast_only） / get_progress_pace。不提供取消掛號／退掛。"
         "代掛：register_start 為 dry-run（不 POST）。register_submit 需 autosubmit=true "
         "且 REG_AUTOSUBMIT=1 或 NTUH_REG_AUTOSUBMIT=1，另需 reCAPTCHA v3 "
         "（mint_ntuh_recaptcha）。病人身分只讀 server env PATIENT_ID / PATIENT_BIRTHDATE，"

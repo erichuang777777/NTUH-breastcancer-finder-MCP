@@ -37,7 +37,7 @@ PII：工具參數禁止傳完整身分證。Server 讀 `PATIENT_ID`、`PATIENT_
 | Tool | 說明 |
 | --- | --- |
 | `search_bookable` | `clinic_slots`。省略 `hospital_id`＝所有 NTUH 列。不過濾乳專。 |
-| `get_live_number` | 只接受 NTUH id。排程 adapter 目前只有 `ntuh`／`ntuh_cancer`／`ntuh_hsinchu`（乳房門診來源）。`from_db=true` 讀已存燈號。 |
+| `get_live_number` | 全部 WebReg 院區全科燈號（T0/CH/C0/T2/T3/T4/T7/Y0）。可選 `breast_only=true`、`campus_code`（新竹可限 T4 或 T7）。`from_db=true` 讀已存燈號。寫入 `live_progress`（`persist` 預設 true）。 |
 | `get_progress_pace` | `live_progress_history` |
 | `register_start` | dry-run，不 POST，回 `confirm_token` |
 | `register_submit` | 須 `autosubmit=true` **且** `REG_AUTOSUBMIT=1` 或 `NTUH_REG_AUTOSUBMIT=1`，NTUH 另需 reCAPTCHA |
@@ -62,3 +62,7 @@ PYTHONPATH=. python scripts/run_preset_at_open.py --preset-id preset_xxx --now
 ```
 
 `--allow-live` 只有在該筆 `dry_run=false` 時才會呼叫 `register_submit`，而且既有的 autosubmit／reCAPTCHA 閘門仍然有效。
+
+## 明確不做
+
+- **取消掛號／退掛**（cancel registration）：本 MCP 不提供退掛工具或流程。`preset_cancel` 只取消本地 18:00 preset，不會呼叫院方退掛 API。

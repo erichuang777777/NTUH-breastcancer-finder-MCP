@@ -1,16 +1,18 @@
-"""Shared NTUH ClinicCurrentLightNo → LiveProgress helpers (T0/C0/T4/T7).
+"""Shared NTUH ClinicCurrentLightNo → LiveProgress helpers (all WebReg campuses).
 
 Public AJAX:
   GET  GetDeptList?vHospitalCode=&RegionCode=
   POST DeptLightTable (HTML cards)
   GET  ClinicCurrentLightNoDetail?ServiceIDSE=&vHospitalCode=
 
-Filter to breast depts (KBRC/KBRV) or name allowlist (T4 SURG).
+Default: every department on the campus. Optional breast_only keeps the
+legacy KBRC/KBRV/SURG(+乳房 keyword) filter.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from datetime import date
@@ -27,8 +29,19 @@ log = logging.getLogger(__name__)
 REG_BASE = "https://reg.ntuh.gov.tw/WebReg/WebReg/"
 USER_AGENT = "BreastCareResearchBot/0.1 (+public schedule research; polite 1req/s)"
 
-# hosp_code → list of (dept_code, specialty_hint, name_allowlist|None)
-PROGRESS_TARGETS: dict[str, list[dict[str, Any]]] = {
+# hospital_id → WebReg vHospCode list (hsinchu has T4 + T7)
+HOSPITAL_HOSP_CODES: dict[str, list[str]] = {
+    "ntuh": ["T0"],
+    "ntuh_children": ["CH"],
+    "ntuh_cancer": ["C0"],
+    "ntuh_beihu": ["T2"],
+    "ntuh_jinshan": ["T3"],
+    "ntuh_hsinchu": ["T4", "T7"],
+    "ntuh_yunlin": ["Y0"],
+}
+
+# Optional breast filter targets (dept_code + flags). Used only when breast_only.
+BREAST_PROGRESS_TARGETS: dict[str, list[dict[str, Any]]] = {
     "T0": [{"dept_code": "KBRC", "dept_zh": "乳房醫學中心", "specialty_tag": "breast_surgery"}],
     "C0": [{"dept_code": "KBRC", "dept_zh": "乳房醫學中心", "specialty_tag": "breast_surgery"}],
     "T7": [{"dept_code": "KBRV", "dept_zh": "乳房醫學中心", "specialty_tag": "breast_surgery"}],
@@ -37,15 +50,50 @@ PROGRESS_TARGETS: dict[str, list[dict[str, Any]]] = {
             "dept_code": "SURG",
             "dept_zh": "外科部",
             "specialty_tag": "breast_surgery",
-            # When set, keep cards whose doctor name is in this set (optional).
-            "name_allowlist": None,  # filled by caller if known
+            "name_allowlist": None,
             "require_breast_keyword_in_detail": True,
         }
     ],
 }
 
+# Back-compat alias used by older call sites / docs
+PROGRESS_TARGETS = BREAST_PROGRESS_TARGETS
+
 _SESSION_FROM_AMPM = {"1": "上午", "2": "下午", "3": "夜間"}
 _NUM_RE = re.compile(r"(\d+)")
+_PLACEHOLDER_NAMES = frozenset(
+    {"主治醫師", "住院醫師", "總醫師", "醫師", "看診中"}
+)
+
+
+def resolve_hosp_codes(
+    hospital_id: str,
+    *,
+    hosp_codes: list[str] | None = None,
+    campus_code: str | None = None,
+) -> list[str]:
+    """Resolve WebReg campus codes for a hospital_id.
+
+    Preference: explicit hosp_codes → campus_code arg → NTUH_REG_HOSP_CODE env
+    → HOSPITAL_HOSP_CODES default. When a campus hint is set and belongs to the
+    hospital, only that code is returned (e.g. T4-only for ntuh_hsinchu).
+    """
+    defaults = list(hosp_codes or HOSPITAL_HOSP_CODES.get(hospital_id, []))
+    hint = (campus_code or os.environ.get("NTUH_REG_HOSP_CODE") or "").strip().upper()
+    if hint:
+        if defaults and hint in defaults:
+            return [hint]
+        if hint in HOSPITAL_HOSP_CODES.get(hospital_id, []):
+            return [hint]
+        # Explicit single-code override when caller passes hosp_codes=[hint]
+        if hosp_codes is None and hint in {
+            c for codes in HOSPITAL_HOSP_CODES.values() for c in codes
+        }:
+            # Only accept if this hospital owns the code
+            for hid, codes in HOSPITAL_HOSP_CODES.items():
+                if hint in codes and hid == hospital_id:
+                    return [hint]
+    return defaults
 
 
 def _soup(html: str):
@@ -67,6 +115,14 @@ def _parse_number_text(text: str) -> int | str | None:
     return t
 
 
+def _doctor_id(hospital_id: str, hosp_code: str, name_zh: str | None) -> str | None:
+    if not name_zh:
+        return None
+    if hospital_id == "ntuh_hsinchu":
+        return f"{hospital_id}:{hosp_code}:{name_zh}"
+    return f"{hospital_id}:{name_zh}"
+
+
 def parse_light_detail_html(
     html: str,
     *,
@@ -77,23 +133,32 @@ def parse_light_detail_html(
     session: str | None,
     specialty_tag: str | None,
     progress_row_fn: Callable[..., dict],
+    department_zh: str | None = None,
 ) -> dict | None:
     """Parse ClinicCurrentLightNoDetail → one LiveProgress dict or None."""
     soup = _soup(html)
     room_el = soup.select_one(".room-number")
     room = room_el.get_text(" ", strip=True) if room_el else ""
-    # Doctor name often near room
     doc = None
     for sel in (".clinic-doc-name", ".doctor-name", "h5", ".card-body"):
         el = soup.select_one(sel)
         if el:
             t = el.get_text(" ", strip=True)
-            # try first CJK name-looking token
             m = re.search(r"([\u4e00-\u9fff·‧]{2,4})", t)
-            if m and m.group(1) not in ("目前燈號", "已叫最大", "預計叫號", "乳房醫學", "主治醫師", "住院醫師", "看診中", "未報到", "已報到", "所有燈號"):
+            if m and m.group(1) not in (
+                "目前燈號",
+                "已叫最大",
+                "預計叫號",
+                "乳房醫學",
+                "主治醫師",
+                "住院醫師",
+                "看診中",
+                "未報到",
+                "已報到",
+                "所有燈號",
+            ):
                 doc = m.group(1)
                 break
-    # Prefer explicit doc name from list page context if embedded
     now_el = soup.select_one(".now-number .number")
     big_el = soup.select_one(".biggest-number .number")
     next_el = soup.select_one(".next-number .number")
@@ -101,12 +166,10 @@ def parse_light_detail_html(
     biggest = _parse_number_text(big_el.get_text(" ", strip=True) if big_el else "")
     nxt = _parse_number_text(next_el.get_text(" ", strip=True) if next_el else "")
 
-    # status from progress-number / 看診中
     status_text = None
     prog = soup.select_one(".progress-number")
     if prog:
         status_text = prog.get_text(" ", strip=True)[:80]
-    # Do not treat the legend word 看診中 in the page chrome as a live status.
 
     local_clinic = None
     rm = re.search(r"(\d+)\s*診", room)
@@ -114,22 +177,18 @@ def parse_light_detail_html(
         local_clinic = rm.group(1).zfill(2)
 
     name_zh = doc
-    # department from room prefix
-    dept_zh = None
-    if "乳房" in room:
-        dept_zh = "乳房醫學中心"
-    elif room:
-        dept_zh = room.split()[0] if room else None
-
-    doctor_id = f"{hospital_id}:{name_zh}" if name_zh else None
-    if hospital_id == "ntuh_hsinchu" and name_zh:
-        doctor_id = f"{hospital_id}:{hosp_code}:{name_zh}"
+    dept_zh = department_zh
+    if not dept_zh:
+        if "乳房" in room:
+            dept_zh = "乳房醫學中心"
+        elif room:
+            dept_zh = room.split()[0] if room else None
 
     return progress_row_fn(
         clinic_date=clinic_date,
         source_url=source_url,
         name_zh=name_zh,
-        doctor_id=doctor_id,
+        doctor_id=_doctor_id(hospital_id, hosp_code, name_zh),
         department_zh=dept_zh or room or None,
         session=session,
         local_clinic_code=local_clinic,
@@ -211,6 +270,30 @@ class NtuhProgressClient:
             raise RuntimeError("missing __RequestVerificationToken on progress page")
         return el["value"]
 
+    def get_dept_list(
+        self, *, hosp_code: str, region_code: str = ""
+    ) -> list[dict[str, str]]:
+        """Return [{dept_code, dept_zh}, ...] excluding the empty placeholder."""
+        resp = self._req(
+            "GET",
+            f"{REG_BASE}GetDeptList",
+            params={"vHospitalCode": hosp_code, "RegionCode": region_code},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        out: list[dict[str, str]] = []
+        for item in data or []:
+            code = (item.get("Value") or "").strip()
+            if not code:
+                continue
+            out.append(
+                {
+                    "dept_code": code,
+                    "dept_zh": (item.get("Text") or code).strip(),
+                }
+            )
+        return out
+
     def dept_light_table(
         self,
         *,
@@ -242,29 +325,92 @@ class NtuhProgressClient:
         return resp.text
 
 
-def fetch_breast_live_progress(
+def _breast_targets_for_hosp(
+    hosp: str,
+    *,
+    client: NtuhProgressClient,
+    name_allowlists: dict[str, set[str]],
+) -> list[dict[str, Any]]:
+    """Build breast-only dept targets: static map, else name contains 乳."""
+    static = BREAST_PROGRESS_TARGETS.get(hosp)
+    if static:
+        out = []
+        for tgt in static:
+            t = dict(tgt)
+            allow = name_allowlists.get(hosp) or t.get("name_allowlist")
+            if allow is not None:
+                t["name_allowlist"] = allow
+            out.append(t)
+        return out
+    try:
+        depts = client.get_dept_list(hosp_code=hosp)
+    except Exception as e:
+        log.warning("GetDeptList %s (breast filter): %s", hosp, e)
+        return []
+    return [
+        {
+            "dept_code": d["dept_code"],
+            "dept_zh": d["dept_zh"],
+            "specialty_tag": "breast_surgery",
+        }
+        for d in depts
+        if "乳" in d["dept_zh"]
+    ]
+
+
+def _all_dept_targets(hosp: str, client: NtuhProgressClient) -> list[dict[str, Any]]:
+    try:
+        depts = client.get_dept_list(hosp_code=hosp)
+    except Exception as e:
+        log.warning("GetDeptList %s failed: %s", hosp, e)
+        return []
+    return [
+        {
+            "dept_code": d["dept_code"],
+            "dept_zh": d["dept_zh"],
+            "specialty_tag": None,
+        }
+        for d in depts
+    ]
+
+
+def fetch_live_progress(
     *,
     hospital_id: str,
-    hosp_codes: list[str],
+    hosp_codes: list[str] | None = None,
     progress_row_fn: Callable[..., dict],
     clinic_date: date | None = None,
     ampm_codes: list[str] | None = None,
     name_allowlists: dict[str, set[str]] | None = None,
     client: NtuhProgressClient | None = None,
     fetch_details: bool = True,
+    breast_only: bool = False,
+    campus_code: str | None = None,
 ) -> list[dict]:
-    """Fetch + filter LiveProgress rows for NTUH family hosp codes."""
+    """Fetch LiveProgress rows for NTUH WebReg campus code(s).
+
+    Default ``breast_only=False`` walks every department from GetDeptList.
+    Set ``breast_only=True`` for the legacy KBRC/KBRV/SURG(+乳房) filter.
+    """
     from schema.adapters.base import today_taipei
 
     clinic_date = clinic_date or today_taipei()
     ampm_codes = ampm_codes or ["1", "2", "3"]
     name_allowlists = name_allowlists or {}
     client = client or NtuhProgressClient()
+    codes = resolve_hosp_codes(
+        hospital_id, hosp_codes=hosp_codes, campus_code=campus_code
+    )
     out: list[dict] = []
     seen: set[tuple] = set()
 
-    for hosp in hosp_codes:
-        targets = PROGRESS_TARGETS.get(hosp, [])
+    for hosp in codes:
+        if breast_only:
+            targets = _breast_targets_for_hosp(
+                hosp, client=client, name_allowlists=name_allowlists
+            )
+        else:
+            targets = _all_dept_targets(hosp, client)
         if not targets:
             continue
         try:
@@ -292,17 +438,10 @@ def fetch_breast_live_progress(
                 cards = parse_dept_light_cards(html)
                 for card in cards:
                     name = card.get("name_zh") or ""
-                    if name in {
-                        "主治醫師",
-                        "住院醫師",
-                        "總醫師",
-                        "醫師",
-                        "看診中",
-                    }:
+                    if name in _PLACEHOLDER_NAMES:
                         name = ""
                     if allow and name and name not in allow:
                         continue
-                    # T4 SURG: optional breast keyword gate on detail only
                     detail_href = card.get("detail_href") or ""
                     source = (
                         f"https://reg.ntuh.gov.tw{detail_href}"
@@ -310,7 +449,14 @@ def fetch_breast_live_progress(
                         else detail_href
                         or f"{REG_BASE}ClinicCurrentLightNo?vHospCode={hosp}"
                     )
-                    key = (hosp, clinic_date.isoformat(), session, name, card.get("room"))
+                    key = (
+                        hosp,
+                        clinic_date.isoformat(),
+                        session,
+                        name,
+                        card.get("room"),
+                        dept,
+                    )
                     if key in seen:
                         continue
                     seen.add(key)
@@ -318,10 +464,8 @@ def fetch_breast_live_progress(
                     if fetch_details and detail_href:
                         try:
                             dhtml = client.detail(detail_href)
-                            # T4: skip non-breast clinics if flag set
                             if tgt.get("require_breast_keyword_in_detail"):
                                 if "乳房" not in dhtml and "乳醫" not in dhtml:
-                                    # still allow if name on allowlist
                                     if not (allow and name in allow):
                                         continue
                             row = parse_light_detail_html(
@@ -333,39 +477,39 @@ def fetch_breast_live_progress(
                                 session=session,
                                 specialty_tag=tgt.get("specialty_tag"),
                                 progress_row_fn=progress_row_fn,
+                                department_zh=tgt.get("dept_zh"),
                             )
                             if row:
-                                # Prefer card doctor name if detail parse weak
                                 if not row.get("name_zh") and name:
                                     row["name_zh"] = name
-                                    row["doctor_id"] = (
-                                        f"{hospital_id}:{hosp}:{name}"
-                                        if hospital_id == "ntuh_hsinchu"
-                                        else f"{hospital_id}:{name}"
+                                    row["doctor_id"] = _doctor_id(
+                                        hospital_id, hosp, name
                                     )
+                                if not row.get("department_zh") and tgt.get("dept_zh"):
+                                    row["department_zh"] = tgt["dept_zh"]
+                                raw = row.get("raw") or {}
+                                if isinstance(raw, dict):
+                                    raw = {
+                                        **raw,
+                                        "hosp_code": hosp,
+                                        "dept_code": dept,
+                                    }
+                                    row["raw"] = raw
                                 out.append(row)
                             continue
                         except Exception as e:
                             log.warning("detail fetch failed %s: %s", detail_href, e)
 
-                    # Card-only stub row (no current number)
                     local = None
                     rm = re.search(r"(\d+)\s*診", card.get("room") or "")
                     if rm:
                         local = rm.group(1).zfill(2)
-                    did = None
-                    if name:
-                        did = (
-                            f"{hospital_id}:{hosp}:{name}"
-                            if hospital_id == "ntuh_hsinchu"
-                            else f"{hospital_id}:{name}"
-                        )
                     out.append(
                         progress_row_fn(
                             clinic_date=clinic_date,
                             source_url=source,
                             name_zh=name or None,
-                            doctor_id=did,
+                            doctor_id=_doctor_id(hospital_id, hosp, name or None),
                             department_zh=tgt.get("dept_zh"),
                             session=session,
                             local_clinic_code=local,
@@ -374,16 +518,49 @@ def fetch_breast_live_progress(
                             max_number=None,
                             status_text=card.get("clinic_type") or None,
                             specialty_tag=tgt.get("specialty_tag"),
-                            raw={"hosp_code": hosp, "card_only": True},
+                            raw={
+                                "hosp_code": hosp,
+                                "dept_code": dept,
+                                "card_only": True,
+                            },
                         )
                     )
     return out
 
 
+def fetch_breast_live_progress(
+    *,
+    hospital_id: str,
+    hosp_codes: list[str],
+    progress_row_fn: Callable[..., dict],
+    clinic_date: date | None = None,
+    ampm_codes: list[str] | None = None,
+    name_allowlists: dict[str, set[str]] | None = None,
+    client: NtuhProgressClient | None = None,
+    fetch_details: bool = True,
+) -> list[dict]:
+    """Back-compat wrapper: breast-filtered live progress."""
+    return fetch_live_progress(
+        hospital_id=hospital_id,
+        hosp_codes=hosp_codes,
+        progress_row_fn=progress_row_fn,
+        clinic_date=clinic_date,
+        ampm_codes=ampm_codes,
+        name_allowlists=name_allowlists,
+        client=client,
+        fetch_details=fetch_details,
+        breast_only=True,
+    )
+
+
 __all__ = [
+    "HOSPITAL_HOSP_CODES",
+    "BREAST_PROGRESS_TARGETS",
     "PROGRESS_TARGETS",
     "NtuhProgressClient",
+    "fetch_live_progress",
     "fetch_breast_live_progress",
     "parse_dept_light_cards",
     "parse_light_detail_html",
+    "resolve_hosp_codes",
 ]

@@ -37,7 +37,8 @@ OpenOnco 乳癌庫仍可用 `scripts/export_ntuh_db.py` 重建骨架，但那不
 
 - 這是 WebReg **目前開放掛號窗**裡、各科門診表上的醫師，不是全職員工名冊。沒有門診的醫師不會出現。`RegForm?newx=` 時效短，不寫進 DB；`register_start` 會重抓該科班表，用姓名 + 日期 + 午別 + 預約碼（`local_clinic_code`）對到掛號鈕。
 - 此窗 0 診的科（仍在科別連結裡）：總院傷口造護小組、預立醫療照護諮商；雲林麻醉部、虎尾影像醫學部。新竹兩院區的 WebReg 沒有影像醫學部／放射科入口。
-- 即時燈號 adapter（`get_live_number` 打網路）目前只掛 `ntuh`、`ntuh_cancer`、`ntuh_hsinchu`，而且沿用 OpenOnco 的乳房門診抓取。`from_db=true` 只讀已存列。
+- 即時燈號（`get_live_number`）已覆蓋全部 WebReg 院區：`ntuh`(T0)、`ntuh_children`(CH)、`ntuh_cancer`(C0)、`ntuh_beihu`(T2)、`ntuh_jinshan`(T3)、`ntuh_hsinchu`(T4／T7)、`ntuh_yunlin`(Y0)。預設抓**全科**燈號（`GetDeptList` → `DeptLightTable`）；`breast_only=true` 才限乳房中心（KBRC／KBRV／SURG+乳房關鍵字）。`from_db=true` 只讀已存 `live_progress`。全科抓取較慢（每科×午別約 1 req/s）。
+- **不實作取消掛號／退掛**（cancel registration）。`preset_cancel` 只取消尚未送出的 18:00 preset 意圖，與院方退掛無關。
 - 預設 **dry-run／不自動送出**。真正 POST 仍要 `REG_AUTOSUBMIT=1` 或 `NTUH_REG_AUTOSUBMIT=1`，以及 NTUH reCAPTCHA v3（`mint_ntuh_recaptcha` 或 `NTUH_RECAPTCHA_TOKEN`）。見 [`docs/NTUH_WEBREG_FLOW.md`](docs/NTUH_WEBREG_FLOW.md)。
 - 不要把身分證、生日、`patient.env`、`.env`、`schedules/raw/` 提交進 git。
 

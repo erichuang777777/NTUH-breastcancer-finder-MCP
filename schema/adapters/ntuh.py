@@ -610,21 +610,32 @@ class NtuhAdapter(HospitalAdapter):
         }
         return slots
 
-    def fetch_live_progress(self) -> list[dict]:
-        """ClinicCurrentLightNo T0 → filter DeptCode=KBRC (乳房醫學中心)."""
-        from .ntuh_progress import fetch_breast_live_progress
+    def fetch_live_progress(
+        self,
+        *,
+        breast_only: bool = False,
+        fetch_details: bool = True,
+        ampm_codes: list[str] | None = None,
+        campus_code: str | None = None,
+    ) -> list[dict]:
+        """ClinicCurrentLightNo T0 — all depts by default; optional breast filter."""
+        from .ntuh_progress import fetch_live_progress
 
-        rows = fetch_breast_live_progress(
+        rows = fetch_live_progress(
             hospital_id=self.hospital_id,
             hosp_codes=["T0"],
             progress_row_fn=self.progress_row,
             client=None,
+            breast_only=breast_only,
+            fetch_details=fetch_details,
+            ampm_codes=ampm_codes,
+            campus_code=campus_code,
         )
         self.last_fetch_report = {
             **getattr(self, "last_fetch_report", {}),
             "progress_total": len(rows),
             "progress_hosp_codes": ["T0"],
-            "progress_filter": "KBRC",
+            "progress_filter": "breast" if breast_only else "all_depts",
         }
         return rows
 
@@ -658,11 +669,10 @@ class NtuhAdapter(HospitalAdapter):
             self.registration_link_row(
                 kind="progress",
                 url=PROGRESS_URL,
-                label_zh="看診進度（全院燈號；需過濾乳房中心）",
-                timetable_how="ntuh_clinic_current_light_filter_breast",
+                label_zh="看診進度（全科燈號）",
+                timetable_how="ntuh_clinic_current_light_all_depts",
                 notes=(
-                    "ClinicCurrentLightNo?vHospCode=T0 lists all clinics; "
-                    "adapter must filter before emit"
+                    "ClinicCurrentLightNo?vHospCode=T0; default fetch is all departments"
                 ),
                 source_url=PROGRESS_URL,
             ),
